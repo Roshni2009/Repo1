@@ -1,0 +1,18 @@
+URLs
+Course Documents: https://github.com/wardviaene/hadoop-ops-course/
+Course Documents zip: https://github.com/wardviaene/hadoop-ops-course/archive/master.zip
+Presentation: https://www.slideshare.net/secret/gm8u9XU8AE0tWN
+Facebook group: https://www.facebook.com/groups/947611682012330/
+
+
+CREATE TABLE IF NOT EXISTS youtube_data_rosh(index_clmn INT, video_id STRING, publish_date STRING, trending_date STRING, category_id INT, subscriber BIGINT, Trend_day_count INT,
+Tag_count INT, Trend_tag_count INT, comment_count INT, comment_disabled STRING, like_dislike_disabled STRING, likes INT, dislike INT,
+tag_appeared_in_title STRING, Views BIGINT) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n' LOCATION '/user/march8lab22/roshini/YouTubeDataAnalysis' TBLPROPERTIES("skip.header.line.count"="1");
+
+CREATE TABLE IF NOT EXISTS youtube_data_rosh(index_clmn INT,video_id STRING,publish_date STRING,trending_date STRING,category_id INT,subscriber BIGINT,Trend_day_count INT,Tag_count INT,Trend_tag_count INT,comment_count INT,comment_disabled STRING,like_dislike_disabled STRING,likes INT,dislike INT,tag_appeared_in_title STRING,views BIGINT) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' TBLPROPERTIES("skip.header.line.count"="1");
+
+CREATE TABLE most_liked_rosh as select likes,category_id,subscriber,trend_day_count,comment_count from youtube_data_rosh where likes>=10000;
+
+SELECT category_id,subscriber,trend_day_count from most_liked_rosh order by trend_day_count DESC limit 10;
+
+INSERT OVERWRITE DIRECTORY ‘/user/march8lab22/Roshini/YouTubeDataAnalysis’ ROW FORMAT DELIMITED FIELDS TERMINATED BY ‘,’ SELECT * from most_liked_rosh where likes > 20000 and comment_count IS NOT NULL order by likes DESC limit 10;

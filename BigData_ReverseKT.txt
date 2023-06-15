@@ -1,0 +1,483 @@
+What is Big Data?
+All data we get are based on 3Vs i.e; Volume, Variety, Velocity, Veracitry(4th V)
+We have distributed system (Processing and Storage)
+How it works?
+Node Clusters to store data (Copy file1.csv into Hadoop)
+128 MB data gets stored in single Block so based on that numb er of blocks are selected and data gets split
+Data Nodes has Blocks in them. Storage capacity in Data Nodes is decided by users.
+Storage Master stores Meta Data, Aggregated data from the Blocks are stored in Master Nodes
+Storage Master or Name Node has Meta Data which consists of consists of Information about Number of Blocks, Block ID,Block Position. (Leader Node)
+Blocks of the file are stored in Slave Node by a service called Data Node.(Worker Node)
+Replication  Factor 3
+Blocks get replicated 3 time and are stored in different different Data Nodes. and Blocks can be in any order)
+If any one Name node goes down due to hardisk crash or network issue data can be retrieved from another data nodes.
+Data Node storage capacity depends on Hard disk capacity.
+There will be 2 Name Nodes, 1 is Active Name Node and 2nd is Passive Name Node, unless active name node is live passive name node gets all information from it and active name node is only responsible for all data
+once active name node goes down then passive name node is considered as active name node and data is reterived from there.
+This is called Name Node high availability where we have more than one name node.
+Yarn Master/Execution Master(Resource Manager) - to provide space available for storage .(Resource manager is the modified version of Job tracker)
+Preprocessing , merging and sorting and post processing are the 3 different task that happens in hadoop.
+Node Manager is the execution Slave and Data Node is the Storage Slave.(Node Manager is the modified version of Task Tracker)
+
+
+Map Reduce Program 
+1) Map Phase-  used to read data that is locally available in each machine .Filtering and Preprocessing is done here.
+We can also remove any unwanted data during Map Phase
+It has Key Value pair of data (K,V(list)).
+Usually whatever comes as group by clause is SQL is choosen as Key and Aggregates are choosen as Value.
+
+2)Shuffle and Sort Phase- Will sort the unique keys and will maintain unique pairs of keys from Map phase.
+i)Keep the unique list of sorted keys
+ii)Identify number of reducers.
+iii)Based on total number of keys each reducer will be assigned with equal number of keys.
+
+3)Copy Phase - runs parallelly to Shuffle and sort phase and paasses data to the reducer from one Node to another.
+
+4) Reduce Phase- used to aggregate the data and is final stage.
+Number of reducers are fixed globally in the Mapreduce framework also user can control number of reducers by overriding it in framework.
+But number of mappers are based on number of input blocks.
+
+Hadoop Ecosystem tools:
+1) Hive --> Will convert SQL Queries into MapReduce Program
+2) Sqoop--> Data import and Export from SQL to Hadoop and viceversa
+Sqoop supports any DBMS that is JDBC Compliant.
+Sqoop connectors allows access to non-compliant external systems.
+Sqoop integrated with Oozie allows us to schedule and automate import and export tasks.
+It allows easy import and export of data from structured data stores such as relational database, enterprise data warehouses and NoSql Systems.
+3)Spark:
+Batch where data is read from Files
+Stream where data is read from input stream
+Spark engine is faster than MapReduce because it is In memory  processing engine.
+4)Flume - collects data from local files and then send it as team to Kafka
+5)Kafka- is a middleware component, its a message queue which is very helpful in case of streaming applications. Data stored in kafka can be used many times and by everyone.
+Message queues where data is received is called Topics
+Topics are partioned for Scalability
+Topic partitions are replicated for high availability(Fault tolerance)
+Every node where kafka service runs is called broker.
+Applications writing data into Kafka topics are called Producers(Flume)
+Applications reading data from Kafka topics are called Consumers.(Spark)
+6)HBase- Database to write n execute even single SQL Query(Single record Operation)
+NoSQL database built on top of Hadoop.--Columnar NoSQL Database.
+
+NameNode-DataNode Communication:
+i)HeartBeats- Every 3 sec every data node will send a heartbeat to the name node for Liveness check.
+If Data Node heart beat is not received for more than 10 min then the data node is considered as dead.
+If the data node is dead then all the blocks stored in the data node has to be replicated into other data nodes.
+ii)Block report(hadoop fsck - blocks -> will show block report)- Every 10th heartbeat will be a block report with following information.
+      a) Total Disk Size
+	  b) Free Space
+	  c) Non-HDFS Usage
+	  d) HDFS Usage
+	  e) List of Blocks (BlockID, Block Size, Health Status)
+	  
+Data Node(Storage Slave) - Every 30 min once it will launch a Background Thread to read all the Block file present locally(Block Scanner) .
+Block Scanner work is to read all the blocks and report whether its healthy block or not.
+    If the block is readable then it is considered as healthy, else it is noted as corrupted.
+	Responsible for storing actually blocks of data in hadoop cluster.
+	Data Node is responsible of creating the replication blocks after getting instruction fron NameNode.
+	DataNode which receives first copy is responsible of creating second copy of file similarlly datanode which receives 2nd copy is responsible of creating 3rd copy.
+
+NodeManager (Execution Slave)
+
+
+Block Placing depends on What are the number of blocks available on the node and what is the free space present in the node.
+	
+Slave Node - Every slave node has a data node in it for storage of data.
+	
+Name Node - Master service of Storage, responsible for entire storage of hadoop and also in identifying Live data nodes.
+Manages cluster level information from the block reports. Most of the time name node is busy because it has to keep on checking liveliness og the data node from 1000's of 
+data node frequently.  Name node folder has fsimage file and editlog files in it.
+When a slave node becomes corrupted the NameNode has the power to decide either to create a block on same datanode or on any other datanode.
+But HDFS never creates second or same copy of the block on the same node.
+
+MetaData: It has FSImage and EditLog in the persistent data/storage also it has InMemory data which has FSImage,EditLog and Block Positions information.
+Block Size and Replication factor both can be determined at file level.
+
+Safe Mode - When Name Node gets restarted it enters into safe mode and doesn't accepts any command until merging of all fsimage, editlogs are done and are saved locally.
+hadoop dfsadmin -safemode enter ->status as safe mode on will be shown on NN:50070bin cluster summary section
+hadoop dfsadmin -safemode leave -> come out of safemode.
+hadoop dfsadmin -safemode get -> will show the status of safemode.
+During upgrade we should put hadoop in safemode.
+
+
+hadoop fs -put file.csv/path - 
+             i) the fs command always goes to the namenode only.
+			 ii) The Name node will perform all the pre-checks like,
+			   a) Is there sufficient cluster capacity.
+			   b) Does the user coping file has all the privilages to do so.
+			   c) Does the file with same name already exists.
+			 iii) All pre-checks are successfull, then proceed further.
+			 iv) Generate metadata for the file 
+			    a) Based on Block size, calculate the number of blocks needed.
+				b) Generate block Ids for each required.
+				c) Decide the data nodes to be used for storing each blocks.
+				d) respond to client with metadata.
+			v) Client starts copying blocks into HDFS.
+			    a) Client copies first copy of each block into the data node.
+				b)DataNode receiving these blocks will create further copies.
+			
+Content addid or editing can be done only on the last block of the file, intermideate file doesn't allow editing.
+
+Secondary Name Node: Every 30 min once secondary name node asks for the existing file(fsimage and editlog) from the primary name node and copies the data in to(Check Point Operation) 
+so incase there is any crash to primary name node we make use of secondary namenode with all our data present in it.
+The data got stored or processed during last 30 min from the NameNode crash will not be stored in Secondary NameNode and those data are lossed.
+Block Position is not stored in FSImage and EditLogs.Because block position keeps on changing due to block corruption and replication.
+Block reports stores the block position.
+
+NameNode HighAvailability:
+More than one name node and both namenode runs simultaniously and one of them will act as active name node
+while other one is considered as passive name node.At very short time the sync happens between active and passive name node.
+While active name node goes down , the passive name node acts as active name node.
+
+ZooKeeper: Responsible for storing very critical meta data and doing co-ordination between active and passive name node.
+It's create new action by deleting old action to activate passive name node.
+One ZooKeeper can handle multiple data nodes.We can have multiple zookeeper.
+
+NameNode Federation: Where we have two or more Active name nodes in order to maintain higher scalability and storage capacity.
+Here we can split similar kind of data and stored them in particular name nodes.
+Every name node will get the information about its own block other block reports will be considered as non-hdfs usage.
+Federation and highavailability occurs parallely.
+ 
+Problem of too many small files:
+HDFS is more suitable in storing small number of large files, and less efficient to store large number of small files.
+
+ Rack Awareness: There are 3 ways to implement Rack Awareness 
+ i) core-site.xml
+ <property>
+ <name>topology.script.file.name</name>
+ <value>path_to_script.sh</value>
+ </property>
+ 
+ --NameNode executes scripts and passes IP address as argument
+ path_to_script.sh will be link
+ if [$1 = "192.168.0.23"]; then
+ echo -n "/rack1"
+ elseecho -n "/default-rack"
+(This is a hardcoded way of telling if each of the node is present in which cluster with their IP address)
+
+ii) Run a script which reads a conf file to get IP address by parsing it.
+This way we are moving IP address outside the script and putting it in a config file.
+The script will look like:
+HADOOP_CONF=/etc/hadoop/conf
+while [$# -gt 0]; do
+nodeArg = $1
+exec < ${HADOOP_CONF}/topology.data
+result = ""
+while read line; do
+
+
+HADOOP Commands:
+get -> downloading from HDFS to local 
+PUT -> Uploading from local to HDFS 
+LIST -> listing files in HDFS
+REMOVE COMMANDS -> remove/deleting  files/folders in HDFS
+PERMISSION RELATED ->chmod, chown 
+
+LIST -> listing files in HDFS
+hadoop fs -ls /
+hadoop fs -ls    -> list contents of home directory
+hadoop fs -ls /path
+hadoop fs -ls -h /path    -> file size is human readable (KB,MB,GB)
+hadoop fs -ls -R /       -> recursive listing of files in HDFS.
+
+chmod changes the permission like read write to the present/current owner
+chown changes the owner itself.
+hadoop fs -rm /filename   -> deletes the particular file whereas
+hadoop fs -rm -r /directory name   ->deletes the entire directory.
+
+Copy from HDFS to HDFS:
+hadoop fs -cp /File1.txt /File2.txt
+hadoop fs -ls /
+
+Move From HDFS to HDFS:
+hadoop fs -mv /apachelog /demo/
+hadoop fs -ls /demo/
+hadoop fs -ls /demo/apachelog
+
+Fault Tolerance -
+Incase any Map task fails it will be restarted 3 times on the same node , in case 3rd attempt also fails that means block is corrupted then it will create one new block on
+some other node and again if it fails then entire job will be considered as corrupted and then we may need to modify our Map Program.
+
+Job Tracker does the following operations
+1) Job Scheduling   ------ Cluster Level Operation
+2) Job Coordination  ------ Job Micromanagement
+3) Fault Tolerance   ------ Job Micromanagement
+4) Heartbeat tracking  ------ Job Micromanagement
+5) Progress tracking  ------ Job Micromanagement
+
+Hadoop 2 features:
+1) Storage Scalability => NameNode Federation
+2) Execution Scalability => Job Tracker's responsibility was split into 
+  i) Cluster Level Operations  ->
+     a) Resource Management
+	      i) Resource Management
+		  ii)Job Scheduling
+  ii) Micromanagement of Jobs  ->
+      a) AppMaster  -> For every job a separate AppMaster instance is launched
+	       i)   Phase Coordination
+		   ii)  Fault Tolerance
+		   iii) Heartbeat Tracking (Progress Tracking)		   
+
+MapReduce Job Sequence:
+1. Client submits job to job tracker.
+2. Job Tracker talks to nameNode.
+3. Job Tracker creates execution plan.
+4. Job Tracker submits works to task tracker.
+5. Task tracker reports progress via Heartbeats.
+6. Job tracker manages phases.
+7. Job tracker updates status.
+
+Micromanagement of Jobs is done by App Master(One Job One App Master).
+
+Before scheduling the job NodeManager needs to interact with Resource manager and give it information regarding available RAM and CPU(Through heartbeat from nodemanager to resource manager),
+blocks, its position(Knows from NameNode) and space in it.
+
+Hadoop 2 Job Execution on Yarn:
+1. Client submits job to the Resource Manager.
+2. Resource Manager communicates to the Name Node and get meta data
+3. Resource Manager prepares the Job Scheduler.
+4. Resource Manager submits the container creation request to the Node Manager.
+5. Resource Manager starts the AppMaster on one of the containers
+6. AppMaster will start the tasks on the corresponding containers as per the Job Schedule prepared by the Resource Manager
+7. Task in containers reports progress, heartbeats to the AppMaster
+8. Once all the tasks are completed, AppMaster will give cleanup commands to the containers on job.
+9. AppMaster reports job level progress to the Resource Manager and gives final status as complete once all the tasks are complete.
+10. AppMaster will cleanup itself.
+11. Resource Manager communicates to the client about job status.
+
+We should not do Aggregation in Map Phase.
+We need to convert data into Key Value pair and do Filtering(removing unnecessary data) in Map Phase.
+Aggregations need to be done in Reduce phase only.
+In case there is no reduce phase in map reduce program then map phase is considered as final phase and map output is considered as final output.
+For a file with 10 blocks 11 containers will be launched. 1 container for each block and +1 container for App Master.
+Fault tolerance(Task failure and restarting) is the most important role of AppMaster.
+
+
+HIVE Session 1 (April-24-2023)
+Hive is SQL Oriented query language.
+Hive is an SQL for Hadoop and helps us as a Datawarehouse management system on HDFS.
+Hive Query Language (HQL) is the language in which we write Hive queries, it is like a dialect of SQL.
+
+Table creation, data load:
+1. Point the table to use data on a folder in HDFS Location.
+2. Load data from another folder in HDFS into Hive.
+
+ROW Format delimitted meaning is whatever data we put into the table should be of same format.
+'/t' means each column should bew separated by a tab (space).
+'/n' each line should be a new line.
+
+For each customer we have separate table that means the data thoughout the file should be of same format.
+like csv files in one table which needs to be separated by ','
+text file in one table.
+xlx files in one table.
+json file in one table.
+tsv file in one table which needs to be separated by '/t'.    ...etc.
+
+In case of JSON File we use SERDE where 
+Serialization: How to write data from the file(SER).
+Deserialization : How to read data from input file(DE).
+
+Why HIVE?
+1. SQL Database professionals feel at home with Hive.
+2. Hive is developed by Facebook, their SQL users were using it to manage their data in Hive.
+3. No need to learn any new languages or new scripting languages.
+
+in Hive Group  by column is considered as Key 
+
+Hive internaally manages METADATA and TableData.
+By Default Hive Metadata store will be on File.
+Meta data has the informations like what are the columns, rows , data types of those rows and columns, location from where
+hive should read data, file format.
+
+Metastore:
+1. Keeps track of all Hive's metadata like database, tables, columns and datatypes.
+2. Keeps track of HDFS mapping.
+3. External tables, these are pointers to data in HDFS.
+External table means Hive is not responsible in managing the storage of the table or meta data of the table.
+When u drop the table the data associated with this table won't get deleted.
+Ex. Data in HBase database can be mapped to a Hive table.
+
+Tables:
+1. Standard tables with typed columns.
+
+Partitions:
+1. Split the data in tales to be stored in many files.
+2. Enhance the query performance in distributed parallel processing mode.
+3. Use partitions when ever possible as they increase performance of Hive queries.
+
+Buckets:
+1. Hash partitions of ranges, speed up joins and also sampling of data.
+
+Database:
+1. Namespace for collection of tables.
+
+Derby is a very small file based database and actual metadata is stored in derby, it gives similar syntax as of SQL to retrieve data.
+but the actual data is stored in a file and derby doesn't even have a server.
+which mean we can just have a derby jar and we can store and retrieve data from adobe file.
+to store actual metadata in production we use proper database, we use derby just for learning purpose or for short period of time.
+
+Hive is OLAP type of Application.
+It allows only read option as schema check.
+Loading data into hive is faster where as instant quering is bit slower takes longer time.(Select query takes 10 min)
+We can insert data in to hive but we cannot updtae, modify or delete data.
+
+Hive Tools are:
+1. Hive Shell
+2. Hive Server(thrift)
+3. Hive Web UI
+4. Thrift Clients.
+
+Language features of hive
+1) Data Types:
+    i) Standard data types of SQL like Numeric, Data, String, Boolean, Binary etc.
+	ii) Complex datatypes like Arrays, Structures, Maps can be used.
+	
+2) Data Definition:
+    i) Create, Alter and Drop.
+	ii) All the three can be done on database, tables, partitions, views, 
+         function and also on Index.
+
+3) Data Manipulation:
+    i) Load : Load for loading data from files into tables.
+	ii) Insert: Not traditional insert to add new data, but used for takin data from existing
+	Hive structure and moving to a new Hive structure (Intra Hive).
+	iii) Select: We spend most of the time in writing select statements.
+	iv) Explain: Insight into schema for the structure, detailed explin will give storage information as well.
+ 
+Hive Execution Types:
+Hive can be run on 
+1) Local mode:
+ If we load data from file system mode 'INPATH' will not be required.
+ 
+2) Mapreduce mode
+'INPATH' is required for mapreduce mode.
+
+
+HIVE Session 2 (April-25-2023)
+1. Hive is not a database because:
+     i) MapReduce program always reads entire data of table which makes performance slow.
+    ii) Normal updates are disabled by default, even if enabled will be of high latency.
+   iii) Huge amount of data to be handled for each query.
+
+2. What is Hive MetaData?
+  Even tables are not actual tables where data is stored, table definitions are just metadata.
+  Table is just a mapping to the actual data in HDFS.
+  Metadata stored by default is in Derby, for production we use MySQL database.
+  Actual data is stored in warehouse directory of HDFS.
+  
+For tsv or text files:
+1) CREATE TABLE wordcount(word STRING) ROW FORMAT DELIMITED FIELDS  TERMINATED BY ‘ ’ LINES TERMINATED BY ‘\n’; 
+SHOW TABLES;  ===> This will create a table called wordcount in Hive where rows are seperated by space and lines are seperated into new line.
+
+2) LOAD DATA INPATH ‘/user/march8lab22/roshini/wcinput1/wordcount_practice.txt’ INTO TABLE wordcount;
+ ===> This will load our data which is in text file from our HDFS location into wordcount table of Hive.(specific to certain row numbers only based on the delimiter we use)
+
+3) Select * from wordcount;  ===> This will show the content of the table wordcount.
+
+4) Select lower(word), count(*) from wordcount group by lower(word) sort by count desc limit 10;
+ ===> This will convert all uppercase words into lowercase and fetch the count of each word by grouping similar words in descending order of count upto first 10 words.
+
+Once file gets loaded into hive table it gets removed from our hdfs location so once again load the file to the HDFS location.
+5) hadoop fs -put /home/march8lab22/roshini/wordcount_practice.txt roshini/wcinput1
+
+6) CREATE TABLE wordcount_fix(word STRING) ROW FORMAT FIELDS TERMINATED BY ‘|’ LINES TERMINATED BY ‘\n’;
+===> This will create a table called wordcount_fix in Hive where rows are seperated by | symbol and lines are seperated into new line.
+
+7)LOAD DATA INPATH ‘/user/march8lab22/roshini/wcinput1/wordcount_practice.txt’ INTO TABLE wordcount_fix;
+===> This will load entire data from our text file which is in HDFS location into wordcount_fix table of Hive.
+
+8) Select * from wordcount_fix;  ===> This will show the content of the table wordcount_fix.
+
+9) CREATE TABLE split_words as select split(word, ‘ ’) as words from wordcount_fix;
+===> This will create a table called split_words in Hive and split our words from wordcount_fix table.
+
+10) Select * from split_words; ===> This will show the content of the table split_words.
+
+11) Select count(*) from split_words;  ===> This will give count of each word from table split_words.
+
+12) CREATE TABLE single_word as select word from split_words LATERAL VIEW explode(words) w as word;
+===> This will create a table called single_words using words from split_words table putting each words into single line.
+
+13) Select * from single_words;  ===> This will show all the content from table single_words.
+
+14) Select lower(word), count(*) from single_words group by lower(word) sort by count desc;
+===> This will convert all uppercase words into lowercase and fetch the count of each word by grouping similar words in descending order of count from single_words table.
+
+15) CREATE TABLE word_count1 as select lower(word), count(*) from single_words group by lower(word) sort by count desc;
+===> This will create a table called word_count1 and loads words and its count from single_words table into it.
+
+16) INSERT OVERWRITE DIRECTORY ‘/user/march8lab22/roshini/wcoutput’ select * from word_count1;
+===> This will export the output from Hive table into our HDFS folder.
+
+17) hadoop fs -ls roshini ===> this will show list of files present in hdfs roshini folder.
+
+18) hadoop fs -cat roshini/wcoutput/000000_0  ===> this will show content of file present in hdfs roshini folder.
+
+Sentiment Analysis For JSON Files:
+It is done when we have lot of raw data but only part of it we need to process.(Veracitry)
+To work with JSON data we need SERDE (Serialization and Deserialization)
+We can join CSV with JSON.
+in sentiment analysis +ve word gets count as + and negative word gets count as -, eg : awesome => +3 and anarchist => -2
+as much as the word impacts positivity or negativity so its numbering increases eg: good has less +ve so it gets +1, amazing is more powerful than good so it gets serialized as +3, similarlly bad is -1, worst is -2
+command to copy content of the folder is 
+hadoop fs -put sample/* /tweets1/
+
+table as id, word, sentiment.
+
+select sum(sentiment) on table group by id;
+
+CREATE EXTERNAL TABLE load_tweets(id BIGINT, text STRING) ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe' LOCATION '/tweets';
+select * from load_tweets limit 10;
+create table split_words as select id as id, split(text,' ') as words from load_tweets;
+select * from split_words limit 100;
+create table tweet_word as select id as id, word from split_words LATERAL VIEW explode(words) w as word;
+select * from tweet_word limit 100;
+create table dictionary(word string, rating int) ROW Format DELIMITED FIELDS TERMINATED BY '\t';
+LOAD DATA INPATH '/AFINN.txt' into TABLE dictionary;
+reate table word_join as select tweet_word.id, tweet_word.word,dictionary.rating from tweet_word
+LEFT OUTER JOIN dictionary ON(tweet_word.word = dictionary.word);
+select id, AVG(rating) as rating from word_join GROUP BY word_join.id order by rating DESC limit 100;
+
+//Option to save output of query into local file system.
+INSERT OVERWRITE LOCAL DIRECTORY '/home/march8lab22/roshini' ROW FORMAT DELIMATED FIELDS TERMINATED BY ','
+SELECT ID,AVG(rating) as rating from word_join GROUP BY word_join.id order by rating DESC;
+
+
+//Export result data in JSON Format 
+INSERT OVERWRITE locat directory '/home/march8lab22/roshini' ROW FORMAT SERDE 
+'com.cloudera.hive.serde.JSONSerDe' select * from load_tweets;
+
+CREATE TABLE results as select id,AVG(rating) as rating from word_join Group by word_join.id order by rating DESC;
+
+select * from load_tweets where id = 1234568890788765
+
+HIVE Session 3 (April-27-2023)
+Two types of delimiter:
+1) Column delimiter : ,
+2) Collection item delimiter:
+
+File Formats:
+1) Default File Format is Text(ASCI Data).
+2) Benifits of Other File Formats
+    i) Saves Storage Space
+   ii) Improves Execution Performance
+  iii) CPU and RAM Requirements are reduced.
+        a) Faster Job Completion.
+   iv) Reduces Network Usage.
+
+Compressed Files:
+1) Formats   and   Extensions
+ - Bzip2             .bz2
+ - Snappy            .snappy
+ - Gzip              .gz
+ - LZO               .lzo
+ 
+2) More Efficient fast compression algorithms offer low compression ratio.
+3) Higher compression algorithms are usually slower and higher in CPU overheads
+4) GZIP format balances between Compression and Performance
+5) Codecs are required to be configured for enabling compression.
+
+
+Compression in MapReduce
+
+
