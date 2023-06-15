@@ -1,0 +1,11 @@
+include will run only that particular method and exclude will ignore that particular method
+eg:
+<class name="may19.Test_004">
+                    <methods>
+                        <exclude name="Facebook_Testing"/>
+
+                             OR
+
+                        <include name="Facebook_Testing"/>
+                    </methods>
+            </class>
